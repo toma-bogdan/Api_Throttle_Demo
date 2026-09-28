@@ -10,7 +10,7 @@ if ((endpoint !== 'foo' && endpoint !== 'bar') || !client) {
 }
 
 const url = `http://localhost:${config.port}/${endpoint}`;
-const attempts = client.capacity + 1;
+const attempts = client[endpoint].capacity + 1;
 
 for (let i = 1; i <= attempts; i++) {
   console.log(`===== Request #${i} =====`);

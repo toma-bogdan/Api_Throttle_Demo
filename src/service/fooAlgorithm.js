@@ -3,9 +3,9 @@ import { rateLimitExceeded, setLimitHeaders } from './limitResponse.js';
 
 // token bucket
 export async function fooAlgorithm(req, res, next) {
-  const { clientId, rateLimitConfig: { fillPerSecond, capacity } } = req;
+  const { capacity, fillPerSecond } = req.clientConfig.foo;
   const store = getStore();
-  const key = `fooAlgorithm:${clientId}`;
+  const key = `fooAlgorithm:${req.clientId}`;
 
   const now = Date.now();
   const state = await store.get(key) || {};

@@ -1,9 +1,29 @@
-import { createClient } from 'redis';
+import { createClient, WatchError } from 'redis';
 import config from '../config/settings.js';
 
 const client = createClient({ url: config.redisUrl });
+client.on('error', (err) => {
+  console.error('Redis error', err);
+});
 
 let isConnected = false;
+let locked = false;
+const waiters = [];
+
+function acquire() {
+  if (!locked) {
+    locked = true;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => waiters.push(resolve));
+}
+
+function release() {
+  const next = waiters.shift();
+  if (next) next();
+  else locked = false;
+}
+
 async function ensureConnected() {
   if (!isConnected) {
     console.info('Connecting to Redis...');
@@ -14,14 +34,31 @@ async function ensureConnected() {
 
 const redisStore = {
   async get(key) {
-    await ensureConnected();
-    const raw = await client.get(key);
-    return raw ? JSON.parse(raw) : null;
+    await acquire();
+    try {
+      await ensureConnected();
+      await client.watch(key);
+      const raw = await client.get(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      release();
+      throw err;
+    }
   },
 
   async set(key, value, ttlSec) {
-    await ensureConnected();
-    await client.set(key, JSON.stringify(value), { EX: ttlSec });
+    try {
+      await ensureConnected();
+      const ttl = Math.max(1, Math.ceil(ttlSec));
+      await client.multi()
+        .set(key, JSON.stringify(value), { EX: ttl })
+        .exec();
+    } catch (err) {
+      if (!(err instanceof WatchError)) await client.unwatch();
+      throw err;
+    } finally {
+      release();
+    }
   },
 };
 

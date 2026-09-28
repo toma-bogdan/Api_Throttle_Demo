@@ -1,5 +1,6 @@
 import { jest } from '@jest/globals';
 import httpMocks from 'node-mocks-http';
+import { validateClients } from '../src/service/auth.js';
 import auth from '../src/service/auth.js';
 import { barAlgorithm } from '../src/service/barAlgorithm.js';
 import { fooAlgorithm } from '../src/service/fooAlgorithm.js';
@@ -22,11 +23,19 @@ describe('auth middleware', () => {
   });
 });
 
+describe('client config', () => {
+  it('rejects a client that is missing an endpoint limit', () => {
+    expect(() => validateClients({
+      'client-x': { foo: { capacity: 1, fillPerSecond: 1 } },
+    })).toThrow('client-x must include foo and bar limits');
+  });
+});
+
 describe('fooAlgorithm', () => {
   it('calls next if there are enough tokens', async () => {
     const req = {
       clientId: 'client-1',
-      rateLimitConfig: { fillPerSecond: 5, capacity: 10 }
+      clientConfig: { foo: { fillPerSecond: 5, capacity: 10 } },
     };
     const res = httpMocks.createResponse();
     res.set = jest.fn();
@@ -39,7 +48,7 @@ describe('fooAlgorithm', () => {
   it('returns 429 if not enough tokens', async () => {
     const req = {
       clientId: 'client-1',
-      rateLimitConfig: { fillPerSecond: 0, capacity: 0 }
+      clientConfig: { foo: { fillPerSecond: 0, capacity: 0 } },
     };
     const res = httpMocks.createResponse();
     res.set = jest.fn();
@@ -55,7 +64,7 @@ describe('barAlgorithm', () => {
   it('calls next if under rate limit', async () => {
     const req = {
       clientId: 'client-1',
-      rateLimitConfig: { windowSeconds: 60, capacity: 5 }
+      clientConfig: { bar: { windowSeconds: 60, capacity: 5 } },
     };
     const res = httpMocks.createResponse();
     res.set = jest.fn();

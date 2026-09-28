@@ -3,9 +3,9 @@ import { rateLimitExceeded, setLimitHeaders } from './limitResponse.js';
 
 // fixed window
 export async function barAlgorithm(req, res, next) {
-  const { clientId, rateLimitConfig: { windowSeconds, capacity } } = req;
+  const { capacity, windowSeconds } = req.clientConfig.bar;
   const store = getStore();
-  const key = `barAlgorithm:${clientId}`;
+  const key = `barAlgorithm:${req.clientId}`;
 
   const now = Date.now();
   const state = (await store.get(key)) || {};

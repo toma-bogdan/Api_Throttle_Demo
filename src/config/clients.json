@@ -1,6 +1,18 @@
 {
-  "client-1": { "windowSeconds": 10, "capacity": 5, "fillPerSecond": 0.1},
-  "client-2": { "windowSeconds": 20, "capacity": 10, "fillPerSecond": 1},
-  "client-3": { "windowSeconds": 60, "capacity": 20, "fillPerSecond": 0.5},
-  "client-4": { "windowSeconds": 10, "capacity": 3, "fillPerSecond": 1.1}
+  "client-1": {
+    "foo": { "capacity": 5, "fillPerSecond": 0.1 },
+    "bar": { "capacity": 5, "windowSeconds": 10 }
+  },
+  "client-2": {
+    "foo": { "capacity": 10, "fillPerSecond": 1 },
+    "bar": { "capacity": 10, "windowSeconds": 20 }
+  },
+  "client-3": {
+    "foo": { "capacity": 20, "fillPerSecond": 0.5 },
+    "bar": { "capacity": 20, "windowSeconds": 60 }
+  },
+  "client-4": {
+    "foo": { "capacity": 3, "fillPerSecond": 1.1 },
+    "bar": { "capacity": 3, "windowSeconds": 10 }
+  }
 }

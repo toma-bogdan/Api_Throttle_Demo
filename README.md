@@ -98,9 +98,9 @@ REDIS_URL=redis://example:6379 npm run start:redis
 All endpoints require an `Authorization: Bearer <clientId>` header. Client ids and their limits are in `src/config/clients.json`.
 
 ### `GET /foo`
-Token bucket. Each client has a `capacity` and a `fillPerSecond` refill rate. A request is allowed while the bucket still holds at least one token.
+Token bucket, using that client's `foo` limit. A request is allowed while the bucket still holds at least one token. `capacity` is the bucket size and `fillPerSecond` is the refill rate.
 
 ### `GET /bar`
-Fixed window. Each client can make `capacity` requests during `windowSeconds`. Further requests in that window are rejected.
+Fixed window, using that client's `bar` limit. The client can make `capacity` requests during `windowSeconds`. Further requests in that window are rejected.
 
 A rejected request from either endpoint returns `429` and `{ "error": "Rate limit exceeded" }`. An allowed request returns `200` and `{ "success": true }`.
