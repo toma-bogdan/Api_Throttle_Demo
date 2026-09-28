@@ -2,7 +2,7 @@ import { jest } from '@jest/globals';
 import httpMocks from 'node-mocks-http';
 import auth from '../src/service/auth.js';
 import { barAlgorithm } from '../src/service/barAlgorithm.js';
-import fooAlgorithm from '../src/service/fooAlgorithm.js';
+import { fooAlgorithm } from '../src/service/fooAlgorithm.js';
 
 describe('auth middleware', () => {
   it('calls next if Authorization header is present', () => {

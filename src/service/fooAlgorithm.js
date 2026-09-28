@@ -1,9 +1,10 @@
-import { getStoreType } from '../storage/index.js';
+import { getStore } from '../storage/selectStore.js';
+import { rateLimitExceeded, setLimitHeaders } from './limitResponse.js';
 
-// this is a token bucket algorithm
-export default async function fooAlgorithm(req, res, next) {
+// token bucket
+export async function fooAlgorithm(req, res, next) {
   const { clientId, rateLimitConfig: { fillPerSecond, capacity } } = req;
-  const store = getStoreType();
+  const store = getStore();
   const key = `fooAlgorithm:${clientId}`;
 
   const now = Date.now();
@@ -15,17 +16,14 @@ export default async function fooAlgorithm(req, res, next) {
   tokens = Math.min(capacity, tokens + deltaSec * fillPerSecond);
   last = now;
 
+  const allowed = tokens >= 1;
+  if (allowed) tokens -= 1;
+
   const ttlSec = Math.ceil((capacity / fillPerSecond) * 2);
-
-  if (tokens >= 1) {
-    tokens -= 1;
-    await store.set(key, { tokens, last }, ttlSec);
-    res.set('X-RateLimit-Remaining', Math.floor(tokens));
-    res.set('X-RateLimit-Limit', capacity);
-    return next();
-  }
-
   await store.set(key, { tokens, last }, ttlSec);
-  return res.status(429)
-    .json({ error: 'Rate limit exceeded' });
+
+  if (!allowed) return rateLimitExceeded(res);
+
+  setLimitHeaders(res, capacity, Math.floor(tokens));
+  return next();
 }

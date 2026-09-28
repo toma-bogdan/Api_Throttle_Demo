@@ -1,13 +1,10 @@
-import { getStoreType } from '../storage/index.js';
+import { getStore } from '../storage/selectStore.js';
+import { rateLimitExceeded, setLimitHeaders } from './limitResponse.js';
 
-// fixed window algorithm
+// fixed window
 export async function barAlgorithm(req, res, next) {
-  const {
-    clientId,
-    rateLimitConfig: { windowSeconds, capacity }
-  } = req;
-
-  const store = getStoreType();
+  const { clientId, rateLimitConfig: { windowSeconds, capacity } } = req;
+  const store = getStore();
   const key = `barAlgorithm:${clientId}`;
 
   const now = Date.now();
@@ -23,19 +20,13 @@ export async function barAlgorithm(req, res, next) {
   const remainingMs = windowSeconds * 1000 - (now - windowStart);
   const ttlSec = Math.max(1, Math.ceil(remainingMs / 1000));
 
-  if (count < capacity) {
-    count++;
-
-    await store.set(key, { count, windowStart }, ttlSec);
-    res.set('X-RateLimit-Limit', capacity);
-    res.set('X-RateLimit-Remaining', capacity - count);
-
-    return next();
-  }
+  const allowed = count < capacity;
+  if (allowed) count++;
 
   await store.set(key, { count, windowStart }, ttlSec);
-  return res
-    .status(429)
-    .set('Retry-After', ttlSec.toString())
-    .json({ error: 'Rate limit exceeded' });
+
+  if (!allowed) return rateLimitExceeded(res, ttlSec);
+
+  setLimitHeaders(res, capacity, capacity - count);
+  return next();
 }

@@ -11,21 +11,22 @@ ShowPadAssessment/
 ├── jest.config.mjs
 ├── eslint.config.js
 ├── docker-compose.yml
-├── .env.example
 ├── .github/workflows/ci.yml
+├── scripts/
+│   ├── demo.js                 # Sends one request past a client's capacity
+│   └── startRedis.js           # Starts the server with Redis storage
 ├── src/
-│   ├── index.js                # Express app entrypoint
+│   ├── server.js               # Express app entrypoint
 │   ├── config/
+│   │   ├── settings.js         # Runtime config, defaults overridden by the environment
 │   │   └── clients.json        # Client rate limit configs
-│   ├── routes/
-│   │   ├── foo.js              # /foo endpoint
-│   │   └── bar.js              # /bar endpoint
 │   ├── service/
 │   │   ├── auth.js             # Auth middleware
 │   │   ├── barAlgorithm.js     # Fixed window rate limiter
-│   │   └── fooAlgorithm.js     # Token bucket rate limiter
+│   │   ├── fooAlgorithm.js     # Token bucket rate limiter
+│   │   └── limitResponse.js    # Shared rate-limit headers and 429 body
 │   └── storage/
-│       ├── index.js            # Storage selector
+│       ├── selectStore.js      # Storage selector
 │       ├── localMemory.js      # In-memory store
 │       └── redisStore.js       # Redis store
 ├── tests/
@@ -44,7 +45,7 @@ npm install
 ```
 
 ### Run the Server
-`npm start` uses in-memory counters. No `.env` file is required. Copy `.env.example` to `.env` only when you want to override `PORT` or `STORAGE`.
+In-memory storage needs no extra services. The process prints which store it is using.
 
 ```sh
 npm start
@@ -53,9 +54,10 @@ npm start
 ### Run with Redis
 ```sh
 docker compose up -d
+npm run start:redis
 ```
 
-In `.env`, set `STORAGE=redis` and `REDIS_URL=redis://localhost:6379`, then start the server again. Counters survive a process restart for as long as that Redis container is running. Stop it with `docker compose down`.
+Counters survive a process restart for as long as that Redis container is running. Stop Redis with `docker compose down`.
 
 ### Run Tests
 ```sh
@@ -71,51 +73,34 @@ npm run lint
 With the server running, each script sends one request past that client's `capacity`. The last response is 429.
 
 ```sh
-npm run demo:foo   # client-1, capacity 5
-npm run demo:bar   # client-3, capacity 20
+npm run demo:foo   # client-1 on /foo, capacity 5
+npm run demo:bar   # client-3 on /bar, capacity 20
 ```
 
-### Environment Variables
-- `PORT` (default: 3000): Port to run the server
-- `STORAGE` (default: `memory`): Set to `redis` to use Redis
-- `REDIS_URL` (default: `redis://localhost:6379`): Redis connection string when `STORAGE=redis`
+### Configuration
+`src/config/settings.js` supplies defaults only. The process reads `PORT`, `STORAGE`, and `REDIS_URL` from the environment at startup, so a deployed host can switch store without changing the code or adding a config file. Set the variables in the host (shell, systemd, Docker, or the cloud console) and restart. One process uses one store.
 
-See `.env.example`. `.env` is local and is not committed.
+Locally, `npm start` leaves `STORAGE` unset, so the store is memory. `npm run start:redis` sets `STORAGE=redis` and then starts the same server.
+
+```sh
+PORT=3001 npm start
+REDIS_URL=redis://example:6379 npm run start:redis
+```
+
+- `PORT` (default: 3000): Port to run the server
+- `STORAGE` (`memory` or `redis`, default: `memory`)
+- `REDIS_URL` (default: `redis://localhost:6379`): Used when `STORAGE=redis`
 
 
 ## API Endpoints
 
 ### Authentication
-All endpoints require an `Authorization: Bearer <clientId>` header. Valid client IDs and their rate limits are defined in `src/config/clients.json`.
-
-There are 4 clients available with different limit rates and works for both endpoints:
-{
-  "client-1": { "windowSeconds": 10, "capacity": 5, "fillPerSecond": 0.1},
-  "client-2": { "windowSeconds": 20, "capacity": 10, "fillPerSecond": 1},
-  "client-3": { "windowSeconds": 60, "capacity": 20, "fillPerSecond": 0.5},
-  "client-4": { "windowSeconds": 10, "capacity": 3, "fillPerSecond": 1.1}
-}
+All endpoints require an `Authorization: Bearer <clientId>` header. Client ids and their limits are in `src/config/clients.json`.
 
 ### `GET /foo`
-- **Rate Limiting:** Token Bucket
-  Clients have a token capacity and a fillPerSecondRate rate which fills the token bucket per second.
-  If a client have no tokens left, the request is dropped. 
-  This approach prevents sudden traffic spikes from an user.
+Token bucket. Each client has a `capacity` and a `fillPerSecond` refill rate. A request is allowed while the bucket still holds at least one token.
 
 ### `GET /bar`
-- **Rate Limiting:** Fixed Window
-  Clients have a fixed window period where they can make "capacity" amount of requests.
-  If a client exceeded that limit the request is dropped until the next window period.
+Fixed window. Each client can make `capacity` requests during `windowSeconds`. Further requests in that window are rejected.
 
-### `Remote Testing`
- The solution is uploaded in a AWS EC2 and can be tested by calling for example:
- - Windows:
-  curl.exe -i `  -H "Authorization: Bearer client-1" `  http://3.122.250.54/bar 
-  curl.exe -i `  -H "Authorization: Bearer client-2" `  http://3.122.250.54/foo
-
-- Linux:
- curl -i -H "Authorization: Bearer client-1" http://3.122.250.54/bar
- curl -i -H "Authorization: Bearer client-1" http://3.122.250.54/foo
-
-## Customization
-- Add or modify client configs in `src/config/clients.json`.
+A rejected request from either endpoint returns `429` and `{ "error": "Rate limit exceeded" }`. An allowed request returns `200` and `{ "success": true }`.

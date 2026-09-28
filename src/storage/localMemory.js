@@ -7,9 +7,6 @@ const memoryStore = {
   async set(key, value) {
     map.set(key, value);
   },
-  async reset(key) {
-    map.delete(key);
-  }
 };
 
 export default memoryStore;
