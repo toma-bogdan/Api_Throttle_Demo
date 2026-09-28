@@ -92,6 +92,19 @@ REDIS_URL=redis://example:6379 npm run start:redis
 - `REDIS_URL` (default: `redis://localhost:6379`): Used when `STORAGE=redis`
 
 
+## Hosted instance
+
+The in-memory API is deployed on Render:
+
+https://api-throttle-demo.onrender.com
+
+```sh
+curl -i -H "Authorization: Bearer client-1" https://api-throttle-demo.onrender.com/foo
+curl -i -H "Authorization: Bearer client-4" https://api-throttle-demo.onrender.com/bar
+```
+
+`client-1` allows 5 calls to `/foo`, then `429`. `client-4` allows 3 calls to `/bar`, then `429`. A missing header returns `401`. An unknown client id returns `403`.
+
 ## API Endpoints
 
 ### Authentication
