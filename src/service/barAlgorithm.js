@@ -7,26 +7,30 @@ export async function barAlgorithm(req, res, next) {
   const store = getStore();
   const key = `barAlgorithm:${req.clientId}`;
 
-  const now = Date.now();
-  const state = (await store.get(key)) || {};
-  let count = state.count ?? 0;
-  let windowStart = state.windowStart ?? now;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const now = Date.now();
+    const state = (await store.get(key)) || {};
+    let count = state.count ?? 0;
+    let windowStart = state.windowStart ?? now;
 
-  if (now - windowStart >= windowSeconds * 1000) {
-    count = 0;
-    windowStart = now;
+    if (now - windowStart >= windowSeconds * 1000) {
+      count = 0;
+      windowStart = now;
+    }
+
+    const remainingMs = windowSeconds * 1000 - (now - windowStart);
+    const ttlSec = Math.max(1, Math.ceil(remainingMs / 1000));
+
+    const allowed = count < capacity;
+    if (allowed) count++;
+
+    if (!await store.set(key, { count, windowStart }, ttlSec)) continue;
+
+    if (!allowed) return rateLimitExceeded(res, ttlSec);
+
+    setLimitHeaders(res, capacity, capacity - count);
+    return next();
   }
 
-  const remainingMs = windowSeconds * 1000 - (now - windowStart);
-  const ttlSec = Math.max(1, Math.ceil(remainingMs / 1000));
-
-  const allowed = count < capacity;
-  if (allowed) count++;
-
-  await store.set(key, { count, windowStart }, ttlSec);
-
-  if (!allowed) return rateLimitExceeded(res, ttlSec);
-
-  setLimitHeaders(res, capacity, capacity - count);
-  return next();
+  throw new Error('Could not save rate limit');
 }

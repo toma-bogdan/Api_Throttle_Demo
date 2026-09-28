@@ -53,8 +53,10 @@ const redisStore = {
       await client.multi()
         .set(key, JSON.stringify(value), { EX: ttl })
         .exec();
+      return true;
     } catch (err) {
-      if (!(err instanceof WatchError)) await client.unwatch();
+      await client.unwatch();
+      if (err instanceof WatchError) return false;
       throw err;
     } finally {
       release();

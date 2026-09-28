@@ -6,6 +6,7 @@ const memoryStore = {
   },
   async set(key, value) {
     map.set(key, value);
+    return true;
   },
 };
 
